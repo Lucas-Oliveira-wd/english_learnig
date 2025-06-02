@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Formulário de Vocabulário em Inglês</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="container centered flex">
+      <div class="logo">
+        <h4>Decorando Palavras em Inglês</h4>  
+      </div>
+      <nav>
+        <button onclick="mostrarSecao('cadastro')">Cadastrar</button>
+        <button onclick="mostrarSecao('tentar')">Tentar</button>
+        <button onclick="mostrarSecao('verificar')">Verificar</button>
+      </nav>  
+    </div>
+  </header>
+  
+
+  <section id="secao-cadastro" class="secao">
+    <div class="container">
+      <h2>Cadastrar Palavra ou Frase</h2>
+      <form id="form-cadastro">
+        <input type="text" id="termo" placeholder="Palavra ou frase" required />
+        <select id="classe" required>
+          <option value="">Selecione a classe</option>
+          <option value="noun">Noun</option>
+          <option value="verb">Verb</option>
+          <option value="adjective">Adjective</option>
+          <option value="adverb">Adverb</option>
+          <option value="conjunction">Conjunction</option>
+          <option value="phrasal verb">Phrasal Verb</option>
+          <option value="phrasal adjective">Phrasal Adjective</option>
+          <option value="idiom">Idiom</option>
+          <option value="expression">Expression</option>
+        </select>
+        <input type="text" id="traducao" placeholder="Tradução em português" required />
+        <button type="submit">Cadastrar</button>
+      </form>  
+    </div>
+    
+  </section>
+
+  <section id="secao-tentar" class="secao" style="display:none">
+    <div class="container">
+      <h2>Tentar Acertar Tradução</h2>
+      <button onclick="novaTentativa()">Nova Palavra</button>
+      <p id="palavra-tentar"></p>
+      <form id="form-tentar">
+        <input type="text" id="resposta" placeholder="Sua tradução" autocomplete="off" />
+        <button id="responder" type="submit">Verificar</button>
+      </form>
+      <p id="resultado"></p>  
+    </div>
+    
+  </section>
+
+  <section id="secao-verificar" class="secao" style="display:none">
+    <div class="container">
+      <h2>Mostrar Tradução</h2>
+      <form id="form-verificar">
+        <input type="text" id="termo-verificar" placeholder="Digite a palavra/frase em inglês" required />
+        <button type="submit">Mostrar Tradução</button>
+      </form>
+      <p id="resultado-verificar"></p>  
+    </div>
+    
+  </section>
+
+  <section>
+    <div class="container">
+      <canvas id="grafico"></canvas>
+    </div>
+    
+  </section>
+
+  <footer style="height: 500px;">
+
+  </footer>
+
+  <script>
+
+    function atualizarAbaAtiva(nome) {
+      const botoes = document.querySelectorAll("nav button");
+      botoes.forEach(btn => {
+        // Mapear o texto do botão para o nome da seção
+        const texto = btn.textContent.toLowerCase();
+        let nomeBotao = "";
+        if (texto.includes("cadastrar")) nomeBotao = "cadastro";
+        else if (texto.includes("tentar")) nomeBotao = "tentar";
+        else if (texto.includes("verificar")) nomeBotao = "verificar";
+
+        if (nomeBotao === nome) {
+          btn.classList.add("ativa");
+        } else {
+          btn.classList.remove("ativa");
+        }
+      });
+    }
+
+    function mostrarSecao(nome) {
+      document.querySelectorAll('.secao').forEach(sec => sec.style.display = 'none');
+      document.getElementById(`secao-${nome}`).style.display = 'block';
+
+      atualizarAbaAtiva(nome);
+      localStorage.setItem('abaAtiva', nome);
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      await carregarDB();
+      desenharGrafico();
+      const aba = localStorage.getItem('abaAtiva') || 'cadastro';
+      mostrarSecao(aba);
+    });
+
+    function enviarPalavra(event) {
+    event.preventDefault();  // <- Impede o reload
+      const palavra = {
+          termo: "carries out",
+          classe: "phrasal verb",
+          traducao: "realizar",
+          acertos: 0
+    };
+    cadastrarPalavra(palavra);
+    }
+    let db = [];
+
+    async function carregarDB() {
+      const res = await fetch("http://localhost:5000/dados");
+      db = await res.json();
+    }
+    let acertosParaRemover = 10;
+    let limitePalavras = 50;
+    let palavraAtual = null;
+
+    function salvarDB() {
+      fetch("http://localhost:5000/dados", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(db)
+      })
+      .then(response => {
+        if (!response.ok) throw new Error("Erro ao salvar dados");
+        return response.text(); // ou apenas return;
+      })
+      .then(() => {
+        // desenharGrafico();
+      })
+      .catch(error => {
+        console.error("Erro no salvarDB:", error);
+        // Mostrar mensagem amigável ao usuário, mas SEM recarregar a página
+        document.getElementById("resultado").innerText = "Falha ao salvar dados, tente novamente.";
+      });
+    }
+
+
+    document.getElementById("form-cadastro").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const termo = document.getElementById("termo").value.trim();
+      const classe = document.getElementById("classe").value.trim();
+      const traducao = document.getElementById("traducao").value.trim();
+
+      const novo = { termo, classe, traducao, acertos: 0 };
+
+      const res = await fetch("http://localhost:5000/dados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(novo)
+      });
+
+      const resposta = await res.json();
+
+      if (resposta.mensagem) {
+        alert(resposta.mensagem);
+      } else {
+        alert(`✅ A palavra "${termo}" foi cadastrada com sucesso!`);
+        carregarDB();
+      }
+    });
+
+    // ✅ Correto: fora do escopo do anterior
+    document.getElementById("form-tentar").addEventListener("submit", (e) => {
+      e.preventDefault();
+      verificarResposta();
+    });
+
+
+    function novaTentativa() {
+      const selecionados = db.slice(0, limitePalavras);
+      if (selecionados.length === 0) {
+        document.getElementById("palavra-tentar").innerText = "Sem palavras cadastradas.";
+        return;
+      }
+
+      palavraAtual = selecionados[Math.floor(Math.random() * selecionados.length)];
+      document.getElementById("palavra-tentar").innerText = palavraAtual.termo;
+      document.getElementById("resposta").value = "";
+      document.getElementById("resultado").innerText = "";
+      document.getElementById("resposta").style.display = "inline-block";
+      document.getElementById("responder").style.display = "inline-block";
+      document.getElementById("resposta").disabled = false;
+      document.getElementById("responder").disabled = false;
+    }
+
+    function verificarResposta() {
+      const respostaInput = document.getElementById("resposta");
+      const botaoResponder = document.getElementById("responder");
+      const resultadoDiv = document.getElementById("resultado");
+
+      const resposta = respostaInput.value.trim().toLowerCase();
+      if (!palavraAtual) return;
+
+      const correta = palavraAtual.traducao.toLowerCase();
+      const idx = db.findIndex(p => p.termo === palavraAtual.termo);
+
+      if (resposta === correta) {
+        db[idx].acertos++;
+        if (db[idx].acertos >= acertosParaRemover) db.splice(idx, 1);
+        resultadoDiv.innerText = "✅ Correto!";
+      } else {
+        db[idx].acertos = 0;
+        resultadoDiv.innerText = `❌ Errado. Resposta correta: ${correta}`;
+
+        // Desativa os campos até clicar novamente em "Nova Palavra"
+        respostaInput.disabled = true;
+        botaoResponder.disabled = true;
+      }
+
+      salvarDB();
+      desenharGrafico();
+    }
+
+
+    // NOVA função: Mostrar Tradução (consulta direta)
+    document.getElementById("form-verificar").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const termo = document.getElementById("termo-verificar").value.trim().toLowerCase();
+      const idx = db.findIndex(p => p.termo.toLowerCase() === termo);
+
+      const resultado = document.getElementById("resultado-verificar");
+
+      if (idx === -1) {
+        resultado.innerText = "Palavra não cadastrada.";
+        return;
+      }
+
+      resultado.innerText = `Tradução: ${db[idx].traducao}`;
+
+      // Zera os acertos (se você quiser penalizar esse comportamento)
+      db[idx].acertos = 0;
+
+      // ⚠️ Nova lógica: Se a palavra consultada for a mesma do desafio atual...
+      if (palavraAtual && termo === palavraAtual.termo.toLowerCase()) {
+        resultado.innerText += "\n(Aviso: esta palavra foi removida do desafio atual)";
+        palavraAtual = null;
+        setTimeout(() => {
+          novaTentativa();
+        }, 1000);
+      }
+
+      desenharGrafico();
+    });
+
+
+    function desenharGrafico() {
+    const ctx = document.getElementById("grafico").getContext("2d");
+    const dados = db.slice(0, limitePalavras);
+
+    const labels = dados.map((_, i) => `Palavra ${i + 1}`);
+    const valores = dados.map(p => p.acertos || 0);
+
+    if (window.myChart) {
+      // Atualiza os dados do gráfico existente
+      window.myChart.data.labels = labels;
+      window.myChart.data.datasets[0].data = valores;
+      window.myChart.update();  // <- atualiza sem recriar
+      return;
+    }
+
+    // Se não existir ainda, cria pela primeira vez
+    window.myChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Acertos consecutivos",
+          data: valores,
+          backgroundColor: "#4caf50"
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true, max: acertosParaRemover }
+        }
+      }
+    });
+    }
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      await carregarDB(); // só carrega o gráfico depois de carregar o DB
+      desenharGrafico();
+    });
+  </script>
+</body>
+</html>
