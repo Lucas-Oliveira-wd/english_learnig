@@ -132,7 +132,7 @@
     let db = [];
 
     async function carregarDB() {
-      const res = await fetch("http://localhost:5000/dados");
+      const res = await fetch("http://localhost:5001/dados");
       db = await res.json();
     }
     let acertosParaRemover = 10;
@@ -140,7 +140,7 @@
     let palavraAtual = null;
 
     function salvarDB() {
-      fetch("http://localhost:5000/dados", {
+      fetch("http://localhost:5001/dados", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json"
@@ -171,7 +171,7 @@
 
       const novo = { termo, classe, traducao, acertos: 0 };
 
-      const res = await fetch("http://localhost:5000/dados", {
+      const res = await fetch("http://localhost:5001/dados", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(novo)
